@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
+const int SCREEN_HEIGHT = 680;
 
 const int FRAMES_PER_SECOND = 30;
 const unsigned int SPAWN_INTERVAL = 1800;
@@ -77,7 +77,7 @@ struct Object {
 };
 
 void create_object(struct Object* self, SDL_Renderer* rend, int x, int y, bool is_Enemy) {
-	self->image = IMG_LoadTexture(rend, "player.png");
+	self->image = IMG_LoadTexture(rend, "leek.png");
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
 	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
 	self->rectangle.x = x; self->rectangle.y = y;
@@ -93,6 +93,11 @@ bool move_object(struct Object* self, SDL_Renderer* rend) {
 bool check_collision(struct Player* self, struct Object* other) {
 	return SDL_HasIntersection(&self->rectangle, &other->rectangle);
 }
+
+struct Score{
+	int score;
+
+};
 
 int main(int argc, char* args[])
 {
@@ -111,7 +116,7 @@ int main(int argc, char* args[])
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
 	struct Player p;
-	create_player(&p, renderer, 100, 380);
+	create_player(&p, renderer, 100, SCREEN_HEIGHT - 160);
 
 	int numObjects = 0; struct Object objects_list[10];
 
