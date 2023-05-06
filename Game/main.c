@@ -60,7 +60,7 @@ void move(struct Player* self, SDL_Renderer* rend) {
 	self->pos_x += self->vel_x;
 	self->rectangle.x += self->vel_x;
 
-	if ((self->pos_x < 0) || (self->pos_x + self->rectangle.w >= SCREEN_WIDTH)){
+	if ((self->rectangle.x < 1) || (self->rectangle.x + self->rectangle.w >= SCREEN_WIDTH)){
 		self->pos_x -= self->vel_x;
 		self->rectangle.x -= self->vel_x;
 	}
@@ -96,23 +96,33 @@ bool check_collision(struct Player* self, struct Object* other) {
 	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && ( other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12));
 }
 
-struct Score{ //when score reaches something, increase interval??
-	int score;
+//Text/Score "class"
+struct Text{ //when score reaches something, increase interval??
+	int text;
 	int fontsize;
 	SDL_Color text_color;
 	SDL_Rect rectangle;
 	TTF_Font* font;
+	SDL_Surface* surface;
+	SDL_Texture* texture;
 };
 
-void initialize_score(struct Score* self, SDL_Renderer* rend) {
-	self->score = 0;
-	self->fontsize = 24;
+void initialize_score(struct Text* self, SDL_Renderer* rend, int size) {
+	self->text = 0;
+	self->fontsize = size;
 	self->text_color.r = 0; self->text_color.g = 0; self->text_color.b = 0;
-	self->rectangle.x = 10; self->rectangle.y = 10; self->rectangle.w = 100; self->rectangle.h = 40;
+	self->rectangle.x = 10; self->rectangle.y = 10; self->rectangle.w = 100; self->rectangle.h = 100;
+	self->font = TTF_OpenFont("BAUHS93.TTF", self->fontsize);
+	self->surface = TTF_RenderText_Solid(self->font, "text is here", self->text_color);
+	self->texture = SDL_CreateTextureFromSurface(rend, self->surface);
 }
 
 int main(int argc, char* args[])
 {
+	SDL_Init(SDL_INIT_VIDEO); //some initializations
+	IMG_Init(IMG_INIT_PNG);
+	TTF_Init();
+
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
 
@@ -133,6 +143,9 @@ int main(int argc, char* args[])
 
 	struct Player p;
 	create_player(&p, renderer, 100, SCREEN_HEIGHT - 120 - 64);
+
+	struct Text score;
+	initialize_score(&score, renderer, 16);
 
 	int numObjects = 0; struct Object objects_list[10];
 
@@ -181,6 +194,7 @@ int main(int argc, char* args[])
 		SDL_RenderClear(renderer);
 
 		SDL_RenderCopy(renderer, ground, NULL, &ground_rectangle); //draw ground
+		SDL_RenderCopy(renderer, score.texture, NULL, &score.rectangle);
 
 		move(&p, renderer); //move player
 
@@ -211,9 +225,15 @@ int main(int argc, char* args[])
 	}
 
 	SDL_DestroyTexture(p.image);
+	SDL_FreeSurface(score.surface);
+	SDL_DestroyTexture(score.texture);
 	SDL_DestroyTexture(ground);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
+
+	TTF_Quit();
+	IMG_Quit();
+	SDL_Quit();
 
 	return 0;
 }
