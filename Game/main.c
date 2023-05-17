@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
@@ -8,7 +10,7 @@ const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 680;
 
 const int FRAMES_PER_SECOND = 30;
-const unsigned int SPAWN_INTERVAL = 1600;
+unsigned int SPAWN_INTERVAL = 1600;
 const int SPEED = 10;
 const int ENEMY_SPEED = 8;
 const int OFFSET = 40;
@@ -49,8 +51,8 @@ void handle_input(struct Player* self) {
 	{
 		switch (event.key.keysym.sym)
 		{
-		case SDLK_LEFT: self->vel_x = 0; break;
-		case SDLK_RIGHT: self->vel_x = 0; break;
+		case SDLK_LEFT: if(self->vel_x == -SPEED) self->vel_x = 0; break;
+		case SDLK_RIGHT: if (self->vel_x == SPEED) self->vel_x = 0; break;
 		}
 	}
 	
@@ -98,7 +100,7 @@ bool check_collision(struct Player* self, struct Object* other) {
 
 //Text/Score "class"
 struct Text{ //when score reaches something, increase interval??
-	int text;
+	char* text;
 	int fontsize;
 	SDL_Color text_color;
 	SDL_Rect rectangle;
@@ -107,14 +109,75 @@ struct Text{ //when score reaches something, increase interval??
 	SDL_Texture* texture;
 };
 
-void initialize_score(struct Text* self, SDL_Renderer* rend, int size) {
-	self->text = 0;
+void initialize_text(struct Text* self, SDL_Renderer* rend, int size, int x, int y, char* text[]) {
+	self->text = SDL_strdup(text);
 	self->fontsize = size;
 	self->text_color.r = 0; self->text_color.g = 0; self->text_color.b = 0;
-	self->rectangle.x = 10; self->rectangle.y = 10; self->rectangle.w = 100; self->rectangle.h = 100;
 	self->font = TTF_OpenFont("BAUHS93.TTF", self->fontsize);
-	self->surface = TTF_RenderText_Solid(self->font, "text is here", self->text_color);
+	TTF_SizeText(self->font, self->text, &self->rectangle.w, &self->rectangle.h);
+	if (x == -1) { //-1 stands for center
+		self->rectangle.x = (SCREEN_WIDTH - self->rectangle.w)/2;
+	}else self->rectangle.x = x; 
+	self->rectangle.y = y;
+	self->surface = TTF_RenderText_Solid(self->font, self->text, self->text_color);
 	self->texture = SDL_CreateTextureFromSurface(rend, self->surface);
+}
+
+struct Score {
+	struct Text text;
+	int score;
+};
+
+void initialize_score(struct Score* self, SDL_Renderer* rend, int size, int x, int y) {
+	initialize_text(&self->text, rend, size, x, y, "00000");
+	self->score = 0;
+}
+
+void update_score(struct Score* self, SDL_Renderer* rend) {
+	switch (self->score){ //increasing spawn interval based on score
+	case(100):
+		SPAWN_INTERVAL = 1400;
+		break;
+	case(200):
+		SPAWN_INTERVAL = 1200;
+		break;
+	case(300):
+		SPAWN_INTERVAL = 1000;
+		break;
+	default:
+		break;
+	}
+	sprintf(self->text.text, "%05d", self->score);
+	SDL_FreeSurface(self->text.surface);
+	SDL_DestroyTexture(self->text.texture);
+	self->text.surface = TTF_RenderText_Solid(self->text.font, self->text.text, self->text.text_color);
+	self->text.texture = SDL_CreateTextureFromSurface(rend, self->text.surface);
+	TTF_SizeText(self->text.font, self->text.text, &self->text.rectangle.w, &self->text.rectangle.h);
+	SDL_RenderCopy(rend, self->text.texture, NULL, &self->text.rectangle);
+}
+
+
+struct Boost {
+	int width, height;
+	SDL_Texture* image;
+	SDL_Rect rectangle;
+	bool is_Caught;
+};
+
+void create_boost(struct Boost* self, SDL_Renderer* rend, int x) {
+	self->image = IMG_LoadTexture(rend, "leek.png");
+	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
+	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
+	self->rectangle.x = x; self->rectangle.y = 0;
+	self->is_Caught = false;
+}
+
+bool check_caught(struct Player* self, struct Boost* other) {
+	if (SDL_HasIntersection(&self->rectangle, &other->rectangle) && (other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12)) {
+		other->is_Caught = true;
+		return true;
+	}
+	return false;
 }
 
 int main(int argc, char* args[])
@@ -144,10 +207,17 @@ int main(int argc, char* args[])
 	struct Player p;
 	create_player(&p, renderer, 100, SCREEN_HEIGHT - 120 - 64);
 
-	struct Text score;
-	initialize_score(&score, renderer, 16);
+	struct Score score;
+	initialize_score(&score, renderer, 32, 10, 10);
+	struct Text title;
+	initialize_text(&title, renderer, 64, -1, 20, "GAME!!!");
+
+	struct Text game_over;
+	initialize_text(&game_over, renderer, 64, -1, 20, "GAME OVER");
 
 	int numObjects = 0; struct Object objects_list[10];
+	struct Boost b;
+	create_boost(&b, renderer, 0);
 
 	unsigned int lastUpdateTime = 0;
 	unsigned int lastSpawnTime = 0;
@@ -158,12 +228,13 @@ int main(int argc, char* args[])
 				break;
 			}
 			if (event.type == SDL_QUIT)
-				break;
+				goto end;
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
-				break;
+				goto end;
 		}
 		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
 		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, title.texture, NULL, &title.rectangle);
 		SDL_RenderPresent(renderer);
 
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
@@ -176,9 +247,9 @@ int main(int argc, char* args[])
 		if (SDL_PollEvent(&event)) { //handling all input
 			handle_input(&p);
 			if (event.type == SDL_QUIT)
-				break;
+				goto end;
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
-				break;
+				goto end;
 		}
 
 		if (SDL_GetTicks() - lastSpawnTime >= SPAWN_INTERVAL && numObjects < 9) { //spawning items
@@ -188,18 +259,27 @@ int main(int argc, char* args[])
 			numObjects++;
 			lastSpawnTime = SDL_GetTicks();
 		}
+		if ((rand() % 100) <= 5) {
+			;
+		}
 
 		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
 
 		SDL_RenderClear(renderer);
 
 		SDL_RenderCopy(renderer, ground, NULL, &ground_rectangle); //draw ground
-		SDL_RenderCopy(renderer, score.texture, NULL, &score.rectangle);
+		
+		update_score(&score, renderer);
 
 		move(&p, renderer); //move player
 
+		//idea: add special boost that will do something, maybe increase interval and make you immune to cans
 		for (int i = 0; i < numObjects; i++) {
 			if (move_object(&objects_list[i], renderer)) {
+				//check if that was leek
+				if (objects_list[i].is_Enemy==false){
+					goto over;
+				}
 				// remove object from the list
 				numObjects--;
 				objects_list[i] = objects_list[numObjects];
@@ -207,10 +287,10 @@ int main(int argc, char* args[])
 			}
 			else if(check_collision(&p, &objects_list[i])) { //check collisions
 				if (objects_list[i].is_Enemy == false){
-					printf("plus jeden byku\n");
+					score.score += 10;
 				}
 				else {
-					printf("sory byku\n");
+					goto over;
 				}
 				//delete object after collision
 				numObjects--;
@@ -224,9 +304,31 @@ int main(int argc, char* args[])
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
 	}
 
+	//game over loop
+	over:
+	while (1)
+	{
+		if (SDL_PollEvent(&event)) { //handling all input
+			if (event.key.keysym.sym == SDLK_k) {
+				break;
+			}
+			if (event.type == SDL_QUIT)
+				break;
+			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
+				break;
+		}
+		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, game_over.texture, NULL, &game_over.rectangle);
+		SDL_RenderPresent(renderer);
+
+		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+	}
+
+	end:
 	SDL_DestroyTexture(p.image);
-	SDL_FreeSurface(score.surface);
-	SDL_DestroyTexture(score.texture);
+	SDL_FreeSurface(score.text.surface);
+	SDL_DestroyTexture(score.text.texture);
 	SDL_DestroyTexture(ground);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
@@ -237,11 +339,3 @@ int main(int argc, char* args[])
 
 	return 0;
 }
-
-//struct Player* new_player;
-//new_player->image = IMG_LoadTexture(rend, "player.jpg");
-//SDL_QueryTexture(new_player->image, NULL, NULL, new_player->width, new_player->height);
-////rectangle
-//new_player->rectangle.w = 2 * new_player->width; new_player->rectangle.h = 2 * new_player->height;
-//new_player->rectangle.x = x; new_player->rectangle.y = 0;
-//return new_player;
