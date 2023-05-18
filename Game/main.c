@@ -112,8 +112,8 @@ struct Text{ //when score reaches something, increase interval??
 void initialize_text(struct Text* self, SDL_Renderer* rend, int size, int x, int y, char* text[]) {
 	self->text = SDL_strdup(text);
 	self->fontsize = size;
-	self->text_color.r = 0; self->text_color.g = 0; self->text_color.b = 0;
-	self->font = TTF_OpenFont("BAUHS93.TTF", self->fontsize);
+	self->text_color.r = 255; self->text_color.g = 131; self->text_color.b = 0;
+	self->font = TTF_OpenFont("04B_30__.TTF", self->fontsize);
 	TTF_SizeText(self->font, self->text, &self->rectangle.w, &self->rectangle.h);
 	if (x == -1) { //-1 stands for center
 		self->rectangle.x = (SCREEN_WIDTH - self->rectangle.w)/2;
@@ -210,7 +210,7 @@ int main(int argc, char* args[])
 	struct Score score;
 	initialize_score(&score, renderer, 32, 10, 10);
 	struct Text title;
-	initialize_text(&title, renderer, 64, -1, 20, "GAME!!!");
+	initialize_text(&title, renderer, 64, -1, 20, "LEEK FEVER");
 
 	struct Text game_over;
 	initialize_text(&game_over, renderer, 64, -1, 20, "GAME OVER");
@@ -287,7 +287,7 @@ int main(int argc, char* args[])
 			}
 			else if(check_collision(&p, &objects_list[i])) { //check collisions
 				if (objects_list[i].is_Enemy == false){
-					score.score += 10;
+					score.score += 100;
 				}
 				else {
 					goto over;
