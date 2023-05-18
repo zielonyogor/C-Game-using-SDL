@@ -123,6 +123,25 @@ void initialize_text(struct Text* self, SDL_Renderer* rend, int size, int x, int
 	self->texture = SDL_CreateTextureFromSurface(rend, self->surface);
 }
 
+struct MovingText{
+	struct Text text;
+	int starting_pos, offset, dir;
+	float new_pos;
+};
+
+void initialize_movingtext(struct MovingText* self, SDL_Renderer* rend, int size, int x, int y, char* text_char[], int offset) {
+	initialize_text(&self->text, rend, size, x, y, text_char);
+	self->offset = offset; self->starting_pos = y; 
+	self->dir = 1; self->new_pos = (float)y;
+}
+
+void move_text(struct MovingText* self, SDL_Renderer* rend) {
+	self->new_pos += 0.5 * self->dir;
+	self->text.rectangle.y = (int)self->new_pos;
+	SDL_RenderCopy(rend, self->text.texture, NULL, &self->text.rectangle);
+	if (abs(self->starting_pos - self->text.rectangle.y) > self->offset) self->dir *= -1;
+}
+
 struct Score {
 	struct Text text;
 	int score;
@@ -135,13 +154,13 @@ void initialize_score(struct Score* self, SDL_Renderer* rend, int size, int x, i
 
 void update_score(struct Score* self, SDL_Renderer* rend) {
 	switch (self->score){ //increasing spawn interval based on score
-	case(100):
+	case(800):
 		SPAWN_INTERVAL = 1400;
 		break;
-	case(200):
+	case(1400):
 		SPAWN_INTERVAL = 1200;
 		break;
-	case(300):
+	case(1800):
 		SPAWN_INTERVAL = 1000;
 		break;
 	default:
@@ -180,6 +199,19 @@ bool check_caught(struct Player* self, struct Boost* other) {
 	return false;
 }
 
+struct Picture{
+	int width, height;
+	SDL_Texture* image;
+	SDL_Rect rectangle;
+};
+
+void initialize_picture(struct Picture* self, SDL_Renderer* rend,int x, int y, char* path[]) {
+	self->image = IMG_LoadTexture(rend, path);
+	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
+	self->rectangle.w = 2 * self->width; self->rectangle.h = 2 * self->height;
+	self->rectangle.x = x; self->rectangle.y = y;
+}
+
 int main(int argc, char* args[])
 {
 	SDL_Init(SDL_INIT_VIDEO); //some initializations
@@ -204,25 +236,40 @@ int main(int argc, char* args[])
 	ground_rectangle.w *= 4; ground_rectangle.h *= 4;
 	ground_rectangle.x = 0; ground_rectangle.y = 0;
 
+	//player
 	struct Player p;
 	create_player(&p, renderer, 100, SCREEN_HEIGHT - 120 - 64);
 
+	//score
 	struct Score score;
 	initialize_score(&score, renderer, 32, 10, 10);
+	
+	//texts
 	struct Text title;
-	initialize_text(&title, renderer, 64, -1, 20, "LEEK FEVER");
+	initialize_text(&title, renderer, 64, -1, 24, "LEEK FEVER");
 
 	struct Text game_over;
 	initialize_text(&game_over, renderer, 64, -1, 20, "GAME OVER");
 
+	struct MovingText continue_text;
+	initialize_movingtext(&continue_text, renderer, 20, -1, 100, "PRESS K TO START", 2);
+
+	//menu pic
+	struct Picture main_menu;
+	initialize_picture(&main_menu, renderer, 0, 0, "menu.png");
+
+	//falling objects
 	int numObjects = 0; struct Object objects_list[10];
 	struct Boost b;
 	create_boost(&b, renderer, 0);
+	bool is_Boosted = false;
 
 	unsigned int lastUpdateTime = 0;
 	unsigned int lastSpawnTime = 0;
+
 	//main menu loop??
 	while (1) {
+		lastUpdateTime = SDL_GetTicks();
 		if (SDL_PollEvent(&event)) { //handling all input
 			if (event.key.keysym.sym == SDLK_k){
 				break;
@@ -232,9 +279,11 @@ int main(int argc, char* args[])
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
 				goto end;
 		}
-		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		//SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
 		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, main_menu.image, NULL, &main_menu.rectangle);
 		SDL_RenderCopy(renderer, title.texture, NULL, &title.rectangle);
+		move_text(&continue_text, renderer);
 		SDL_RenderPresent(renderer);
 
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
@@ -324,7 +373,7 @@ int main(int argc, char* args[])
 
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
 	}
-
+	//add credits?? props to tvchany
 	end:
 	SDL_DestroyTexture(p.image);
 	SDL_FreeSurface(score.text.surface);
