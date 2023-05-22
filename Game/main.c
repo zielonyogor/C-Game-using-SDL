@@ -12,11 +12,11 @@ const int SCREEN_HEIGHT = 680;
 const int FRAMES_PER_SECOND = 30;
 unsigned int SPAWN_INTERVAL = 1600;
 unsigned int BOOST_INTERVAL = 10000;
-unsigned int BOOST_TIME = 4000;
+unsigned int BOOST_TIME = 6000;
 unsigned int BOOST_MUL = 2;
 unsigned int COLOUR_INTERVAL = 400;
 const int SPEED = 10;
-const int ENEMY_SPEED = 8;
+unsigned int ENEMY_SPEED = 8;
 const int OFFSET = 40;
 
 bool is_Boosted = false;
@@ -224,6 +224,7 @@ void initialize_picture(struct Picture* self, SDL_Renderer* rend,int x, int y, c
 	self->rectangle.x = x; self->rectangle.y = y;
 }
 
+//tint for fever mode
 void apply_tint(SDL_Renderer* renderer, SDL_Color color) {
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 80);
@@ -234,7 +235,7 @@ void apply_tint(SDL_Renderer* renderer, SDL_Color color) {
 SDL_Color calculate_tint(SDL_Color *col) {
 	switch (col->g)
 	{
-	case(33):
+	case(33): //magenta -> yellow -> cyan because i said so
 		col->g = 216; col->b = 0;
 		break;
 	case(216):
@@ -392,7 +393,10 @@ int main(int argc, char* args[])
 			b.is_Present = true;
 		}
 		if (SDL_GetTicks() - lastBoostTime >= BOOST_TIME && is_Boosted){
-			is_Boosted = false; printf("koniec byku\n");
+			is_Boosted = false; 
+			printf("koniec byku\n");
+			ENEMY_SPEED -= BOOST_MUL;
+			SPAWN_INTERVAL *=  BOOST_MUL;
 		}
 
 		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
@@ -400,8 +404,7 @@ int main(int argc, char* args[])
 		SDL_RenderClear(renderer);
 
 		SDL_RenderCopy(renderer, ground, NULL, &ground_rectangle); //draw ground
-		
-		update_score(&score, renderer);
+
 
 		move(&p, renderer); //move player
 
@@ -414,6 +417,8 @@ int main(int argc, char* args[])
 				lastBoostTime = SDL_GetTicks();
 				is_Boosted = true;
 				b.is_Present = false;
+				ENEMY_SPEED += BOOST_MUL;
+				SPAWN_INTERVAL /= BOOST_MUL;
 			}
 		}
 
@@ -449,6 +454,8 @@ int main(int argc, char* args[])
 			}
 			apply_tint(renderer, tint);
 		}
+
+		update_score(&score, renderer);
 
 		SDL_RenderPresent(renderer);
 
