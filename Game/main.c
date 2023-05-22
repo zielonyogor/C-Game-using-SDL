@@ -11,9 +11,19 @@ const int SCREEN_HEIGHT = 680;
 
 const int FRAMES_PER_SECOND = 30;
 unsigned int SPAWN_INTERVAL = 1600;
+unsigned int BOOST_INTERVAL = 10000;
+unsigned int BOOST_TIME = 4000;
+unsigned int BOOST_MUL = 2;
+unsigned int COLOUR_INTERVAL = 400;
 const int SPEED = 10;
 const int ENEMY_SPEED = 8;
 const int OFFSET = 40;
+
+bool is_Boosted = false;
+unsigned int lastBoostTime = 0;
+unsigned int lastUpdateTime = 0;
+unsigned int lastSpawnTime = 0;
+unsigned int lastColourTime = 0;
 
 SDL_Event event;
 
@@ -26,7 +36,7 @@ struct Player {
 
 void create_player(struct Player* self, SDL_Renderer* rend, int x, int y) {
 	self->image = NULL;
-	self->image = IMG_LoadTexture(rend, "player.png");
+	self->image = IMG_LoadTexture(rend, "images/player.png");
 	if (self->image == NULL) {
 		printf("error ups\n");
 		return;
@@ -79,8 +89,8 @@ struct Object {
 
 void create_object(struct Object* self, SDL_Renderer* rend, int x, int y, bool is_Enemy) {
 	if (is_Enemy) {
-		self->image = IMG_LoadTexture(rend, "can.png");
-	} else self->image = IMG_LoadTexture(rend, "leek.png");
+		self->image = IMG_LoadTexture(rend, "images/can.png");
+	} else self->image = IMG_LoadTexture(rend, "images/leek.png");
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
 	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
 	self->rectangle.x = x; self->rectangle.y = y;
@@ -98,8 +108,8 @@ bool check_collision(struct Player* self, struct Object* other) {
 	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && ( other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12));
 }
 
-//Text/Score "class"
-struct Text{ //when score reaches something, increase interval??
+//Text "class"
+struct Text{
 	char* text;
 	int fontsize;
 	SDL_Color text_color;
@@ -175,28 +185,30 @@ void update_score(struct Score* self, SDL_Renderer* rend) {
 	SDL_RenderCopy(rend, self->text.texture, NULL, &self->text.rectangle);
 }
 
-
+//Boost "Class"
 struct Boost {
 	int width, height;
 	SDL_Texture* image;
 	SDL_Rect rectangle;
-	bool is_Caught;
+	bool is_Present;
 };
 
 void create_boost(struct Boost* self, SDL_Renderer* rend, int x) {
-	self->image = IMG_LoadTexture(rend, "leek.png");
+	self->image = IMG_LoadTexture(rend, "images/note.png");
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
-	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
+	self->rectangle.w = 3 * self->width; self->rectangle.h = 3 * self->height;
 	self->rectangle.x = x; self->rectangle.y = 0;
-	self->is_Caught = false;
+	self->is_Present = false;
 }
 
-bool check_caught(struct Player* self, struct Boost* other) {
-	if (SDL_HasIntersection(&self->rectangle, &other->rectangle) && (other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12)) {
-		other->is_Caught = true;
-		return true;
-	}
-	return false;
+bool move_boost(struct Boost* self, SDL_Renderer *rend) {
+	self->rectangle.y += ENEMY_SPEED + 1;
+	SDL_RenderCopy(rend, self->image, NULL, &self->rectangle);
+	return (self->rectangle.y > SCREEN_HEIGHT);
+}
+
+bool check_boost(struct Player *self, struct Boost *other) {
+	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && (other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12));
 }
 
 struct Picture{
@@ -212,11 +224,38 @@ void initialize_picture(struct Picture* self, SDL_Renderer* rend,int x, int y, c
 	self->rectangle.x = x; self->rectangle.y = y;
 }
 
+void apply_tint(SDL_Renderer* renderer, SDL_Color color) {
+	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+	SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 80);
+	SDL_Rect rect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+	SDL_RenderFillRect(renderer, &rect);
+}
+
+SDL_Color calculate_tint(SDL_Color *col) {
+	switch (col->g)
+	{
+	case(33):
+		col->g = 216; col->b = 0;
+		break;
+	case(216):
+		col->r = 33; col->g = 177; col->b = 255;
+		break;
+	default:
+		col->r = 255; col->g = 33; col->b = 140;
+		break;
+	}
+}
+
+/*-------------------------------
+---------MAIN FUNCTION-----------
+-------------------------------*/
+
 int main(int argc, char* args[])
 {
 	SDL_Init(SDL_INIT_VIDEO); //some initializations
 	IMG_Init(IMG_INIT_PNG);
 	TTF_Init();
+	srand();
 
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
@@ -231,7 +270,7 @@ int main(int argc, char* args[])
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
 	//create ground, player, list for objects
-	ground = IMG_LoadTexture(renderer, "ground.png");
+	ground = IMG_LoadTexture(renderer, "images/ground.png");
 	SDL_QueryTexture(ground, NULL, NULL, &ground_rectangle.w, &ground_rectangle.h); 
 	ground_rectangle.w *= 4; ground_rectangle.h *= 4;
 	ground_rectangle.x = 0; ground_rectangle.y = 0;
@@ -254,20 +293,31 @@ int main(int argc, char* args[])
 	struct MovingText continue_text;
 	initialize_movingtext(&continue_text, renderer, 20, -1, 100, "PRESS K TO START", 2);
 
+	struct Text how_to;
+	initialize_text(&how_to, renderer, 32, -1, 200, "HOW TO PLAY");
+	struct Text move_as;
+	initialize_text(&move_as, renderer, 26, -1, 240, "USE A S TO MOVE");
+	struct Text what_collect;
+	initialize_text(&what_collect, renderer, 26, -1, 280, "CATCH LEEK AND NOTE BOOST");
+	struct Text what_avoid;
+	initialize_text(&what_avoid, renderer, 26, -1, 310, "AVOID CAT FOOD");
+
 	//menu pic
 	struct Picture main_menu;
-	initialize_picture(&main_menu, renderer, 0, 0, "menu.png");
+	initialize_picture(&main_menu, renderer, 0, 0, "images/menu.png");
 
 	//falling objects
 	int numObjects = 0; struct Object objects_list[10];
+	
+	//boost
 	struct Boost b;
 	create_boost(&b, renderer, 0);
-	bool is_Boosted = false;
 
-	unsigned int lastUpdateTime = 0;
-	unsigned int lastSpawnTime = 0;
+	//tint
+	SDL_Color tint; 
+	calculate_tint(&tint);
 
-	//main menu loop??
+	//main menu loop
 	while (1) {
 		lastUpdateTime = SDL_GetTicks();
 		if (SDL_PollEvent(&event)) { //handling all input
@@ -288,7 +338,34 @@ int main(int argc, char* args[])
 
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
 	}
+	//wait is so that it won't jump straight to main game
+	int wait = 0;
+	//how to play intro
+	while (1) {
+		lastUpdateTime = SDL_GetTicks();
+		if (SDL_PollEvent(&event) && wait>20) { //handling all input
+			if (event.key.keysym.sym == SDLK_k) {
+				break;
+			}
+			if (event.type == SDL_QUIT)
+				goto end;
+			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
+				goto end;
+		}
+		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, how_to.texture, NULL, &how_to.rectangle);
+		SDL_RenderCopy(renderer, move_as.texture, NULL, &move_as.rectangle);
+		SDL_RenderCopy(renderer, what_collect.texture, NULL, &what_collect.rectangle);
+		SDL_RenderCopy(renderer, what_avoid.texture, NULL, &what_avoid.rectangle);
+		move_text(&continue_text, renderer);
+		SDL_RenderPresent(renderer);
 
+		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+		wait++;
+	}
+
+	lastBoostTime = SDL_GetTicks();
 	//main game loop
 	while (1) {
 
@@ -308,8 +385,14 @@ int main(int argc, char* args[])
 			numObjects++;
 			lastSpawnTime = SDL_GetTicks();
 		}
-		if ((rand() % 100) <= 5) {
-			;
+
+		if (SDL_GetTicks() - lastBoostTime >= BOOST_INTERVAL && !b.is_Present && !is_Boosted && rand() % 100 <= 5 ) {
+			b.rectangle.y = 0;
+			b.rectangle.x = OFFSET + rand() % (SCREEN_WIDTH - 3 * OFFSET);
+			b.is_Present = true;
+		}
+		if (SDL_GetTicks() - lastBoostTime >= BOOST_TIME && is_Boosted){
+			is_Boosted = false; printf("koniec byku\n");
 		}
 
 		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
@@ -322,11 +405,22 @@ int main(int argc, char* args[])
 
 		move(&p, renderer); //move player
 
-		//idea: add special boost that will do something, maybe increase interval and make you immune to cans
+		if (b.is_Present) {
+			if (move_boost(&b, renderer)){
+				b.is_Present = false;
+			}
+			if (check_boost(&p, &b)) {
+				printf("zlapane byku\n");
+				lastBoostTime = SDL_GetTicks();
+				is_Boosted = true;
+				b.is_Present = false;
+			}
+		}
+
 		for (int i = 0; i < numObjects; i++) {
 			if (move_object(&objects_list[i], renderer)) {
-				//check if that was leek
-				if (objects_list[i].is_Enemy==false){
+				//check if that was leek if so game over
+				if (objects_list[i].is_Enemy==false && !is_Boosted){
 					goto over;
 				}
 				// remove object from the list
@@ -338,7 +432,7 @@ int main(int argc, char* args[])
 				if (objects_list[i].is_Enemy == false){
 					score.score += 100;
 				}
-				else {
+				else if (!is_Boosted) { //cant hit you when boosted
 					goto over;
 				}
 				//delete object after collision
@@ -346,6 +440,14 @@ int main(int argc, char* args[])
 				objects_list[i] = objects_list[numObjects];
 				i--;
 			}
+		}
+
+		if (is_Boosted) {
+			if (SDL_GetTicks() - lastColourTime >= COLOUR_INTERVAL) {
+				calculate_tint(&tint);
+				lastColourTime = SDL_GetTicks();
+			}
+			apply_tint(renderer, tint);
 		}
 
 		SDL_RenderPresent(renderer);
@@ -376,7 +478,7 @@ int main(int argc, char* args[])
 	//add credits?? props to tvchany
 	end:
 	SDL_DestroyTexture(p.image);
-	SDL_FreeSurface(score.text.surface);
+	SDL_FreeSurface(score.text.surface); //need to add more
 	SDL_DestroyTexture(score.text.texture);
 	SDL_DestroyTexture(ground);
 	SDL_DestroyRenderer(renderer);
