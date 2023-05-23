@@ -44,7 +44,7 @@ void create_player(struct Player* self, SDL_Renderer* rend, int x, int y) {
 	self->vel_x = 0;
 	self->pos_x = x; self->pos_y = y;
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
-	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
+	self->rectangle.w = 2 * self->width; self->rectangle.h = 2 * self->height;
 	self->rectangle.x = x; self->rectangle.y = y;
 }
 
@@ -92,7 +92,7 @@ void create_object(struct Object* self, SDL_Renderer* rend, int x, int y, bool i
 		self->image = IMG_LoadTexture(rend, "images/can.png");
 	} else self->image = IMG_LoadTexture(rend, "images/leek.png");
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
-	self->rectangle.w = 4 * self->width; self->rectangle.h = 4 * self->height;
+	self->rectangle.w = 2 * self->width; self->rectangle.h = 2 * self->height;
 	self->rectangle.x = x; self->rectangle.y = y;
 	self->is_Enemy = is_Enemy;
 }
@@ -273,35 +273,37 @@ int main(int argc, char* args[])
 	//create ground, player, list for objects
 	ground = IMG_LoadTexture(renderer, "images/ground.png");
 	SDL_QueryTexture(ground, NULL, NULL, &ground_rectangle.w, &ground_rectangle.h); 
-	ground_rectangle.w *= 4; ground_rectangle.h *= 4;
+	ground_rectangle.w *= 2; ground_rectangle.h *= 2;
 	ground_rectangle.x = 0; ground_rectangle.y = 0;
 
 	//player
 	struct Player p;
-	create_player(&p, renderer, 100, SCREEN_HEIGHT - 120 - 64);
+	create_player(&p, renderer, 100, SCREEN_HEIGHT - 184);
 
 	//score
 	struct Score score;
-	initialize_score(&score, renderer, 32, 10, 10);
+	initialize_score(&score, renderer, 32, 14, 14);
 	
 	//texts
 	struct Text title;
 	initialize_text(&title, renderer, 64, -1, 24, "LEEK FEVER");
 
 	struct Text game_over;
-	initialize_text(&game_over, renderer, 64, -1, 20, "GAME OVER");
+	initialize_text(&game_over, renderer, 64, -1, 40, "GAME OVER");
 
 	struct MovingText continue_text;
-	initialize_movingtext(&continue_text, renderer, 20, -1, 100, "PRESS K TO START", 2);
+	initialize_movingtext(&continue_text, renderer, 20, -1, 100, "PRESS SPACE TO START", 2);
 
 	struct Text how_to;
-	initialize_text(&how_to, renderer, 32, -1, 200, "HOW TO PLAY");
+	initialize_text(&how_to, renderer, 42, -1, 160, "HOW TO PLAY");
 	struct Text move_as;
-	initialize_text(&move_as, renderer, 26, -1, 240, "USE A S TO MOVE");
+	initialize_text(&move_as, renderer, 26, -1, 240, "USE ARROWS TO MOVE");
 	struct Text what_collect;
-	initialize_text(&what_collect, renderer, 26, -1, 280, "CATCH LEEK AND NOTE BOOST");
+	initialize_text(&what_collect, renderer, 26, -1, 276, "CATCH LEEK AND NOTE BOOST");
 	struct Text what_avoid;
-	initialize_text(&what_avoid, renderer, 26, -1, 310, "AVOID CAT FOOD");
+	initialize_text(&what_avoid, renderer, 26, -1, 312, "AVOID CAT FOOD");
+	struct Text score_final;
+	initialize_text(&score_final, renderer, 26, -1, 240, "YOUR SCORE:");
 
 	//menu pic
 	struct Picture main_menu;
@@ -322,7 +324,7 @@ int main(int argc, char* args[])
 	while (1) {
 		lastUpdateTime = SDL_GetTicks();
 		if (SDL_PollEvent(&event)) { //handling all input
-			if (event.key.keysym.sym == SDLK_k){
+			if (event.key.keysym.sym == SDLK_SPACE){
 				break;
 			}
 			if (event.type == SDL_QUIT)
@@ -330,7 +332,6 @@ int main(int argc, char* args[])
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
 				goto end;
 		}
-		//SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, main_menu.image, NULL, &main_menu.rectangle);
 		SDL_RenderCopy(renderer, title.texture, NULL, &title.rectangle);
@@ -341,11 +342,12 @@ int main(int argc, char* args[])
 	}
 	//wait is so that it won't jump straight to main game
 	int wait = 0;
+	continue_text.text.rectangle.y = 400; continue_text.starting_pos = 400; continue_text.new_pos = 400.0;
 	//how to play intro
 	while (1) {
 		lastUpdateTime = SDL_GetTicks();
 		if (SDL_PollEvent(&event) && wait>20) { //handling all input
-			if (event.key.keysym.sym == SDLK_k) {
+			if (event.key.keysym.sym == SDLK_SPACE) {
 				break;
 			}
 			if (event.type == SDL_QUIT)
@@ -353,7 +355,7 @@ int main(int argc, char* args[])
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
 				goto end;
 		}
-		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, how_to.texture, NULL, &how_to.rectangle);
 		SDL_RenderCopy(renderer, move_as.texture, NULL, &move_as.rectangle);
@@ -399,7 +401,7 @@ int main(int argc, char* args[])
 			SPAWN_INTERVAL *=  BOOST_MUL;
 		}
 
-		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
 
 		SDL_RenderClear(renderer);
 
@@ -411,6 +413,7 @@ int main(int argc, char* args[])
 		if (b.is_Present) {
 			if (move_boost(&b, renderer)){
 				b.is_Present = false;
+				lastBoostTime = SDL_GetTicks();
 			}
 			if (check_boost(&p, &b)) {
 				printf("zlapane byku\n");
@@ -435,7 +438,8 @@ int main(int argc, char* args[])
 			}
 			else if(check_collision(&p, &objects_list[i])) { //check collisions
 				if (objects_list[i].is_Enemy == false){
-					score.score += 100;
+					if(is_Boosted) score.score += 200;
+					else score.score += 100;
 				}
 				else if (!is_Boosted) { //cant hit you when boosted
 					goto over;
@@ -464,6 +468,8 @@ int main(int argc, char* args[])
 
 	//game over loop
 	over:
+	score.text.rectangle.x = (SCREEN_WIDTH - score.text.rectangle.w) / 2;
+	score.text.rectangle.y = 270;
 	while (1)
 	{
 		if (SDL_PollEvent(&event)) { //handling all input
@@ -475,9 +481,11 @@ int main(int argc, char* args[])
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
 				break;
 		}
-		SDL_SetRenderDrawColor(renderer, 168, 224, 229, 255); //draw background color
+		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, game_over.texture, NULL, &game_over.rectangle);
+		SDL_RenderCopy(renderer, score_final.texture, NULL, &score_final.rectangle);
+		SDL_RenderCopy(renderer, score.text.texture, NULL, &score.text.rectangle);
 		SDL_RenderPresent(renderer);
 
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
