@@ -164,13 +164,16 @@ void initialize_score(struct Score* self, SDL_Renderer* rend, int size, int x, i
 
 void update_score(struct Score* self, SDL_Renderer* rend) {
 	switch (self->score){ //increasing spawn interval based on score
-	case(800):
+	case(1000):
+	case(1100):
 		SPAWN_INTERVAL = 1400;
 		break;
-	case(1400):
+	case(1800):
+	case(1900):
 		SPAWN_INTERVAL = 1200;
 		break;
-	case(1800):
+	case(3000):
+	case(3100):
 		SPAWN_INTERVAL = 1000;
 		break;
 	default:
@@ -389,7 +392,7 @@ int main(int argc, char* args[])
 			lastSpawnTime = SDL_GetTicks();
 		}
 
-		if (SDL_GetTicks() - lastBoostTime >= BOOST_INTERVAL && !b.is_Present && !is_Boosted && rand() % 100 <= 5 ) {
+		if (SDL_GetTicks() - lastBoostTime >= BOOST_INTERVAL && !b.is_Present && !is_Boosted && rand() % 100 <= 3 ) {
 			b.rectangle.y = 0;
 			b.rectangle.x = OFFSET + rand() % (SCREEN_WIDTH - 3 * OFFSET);
 			b.is_Present = true;
@@ -398,7 +401,7 @@ int main(int argc, char* args[])
 			is_Boosted = false; 
 			printf("koniec byku\n");
 			ENEMY_SPEED -= BOOST_MUL;
-			SPAWN_INTERVAL *=  BOOST_MUL;
+			SPAWN_INTERVAL += 300 * BOOST_MUL;
 		}
 
 		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
@@ -421,7 +424,8 @@ int main(int argc, char* args[])
 				is_Boosted = true;
 				b.is_Present = false;
 				ENEMY_SPEED += BOOST_MUL;
-				SPAWN_INTERVAL /= BOOST_MUL;
+				SPAWN_INTERVAL -= 300 * BOOST_MUL;
+				printf("%d", SPAWN_INTERVAL);
 			}
 		}
 
@@ -473,9 +477,6 @@ int main(int argc, char* args[])
 	while (1)
 	{
 		if (SDL_PollEvent(&event)) { //handling all input
-			if (event.key.keysym.sym == SDLK_k) {
-				break;
-			}
 			if (event.type == SDL_QUIT)
 				break;
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
