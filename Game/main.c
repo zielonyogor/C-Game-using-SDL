@@ -259,7 +259,7 @@ int main(int argc, char* args[])
 	SDL_Init(SDL_INIT_VIDEO); //some initializations
 	IMG_Init(IMG_INIT_PNG);
 	TTF_Init();
-	srand();
+	srand(time(NULL));
 
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
@@ -370,9 +370,9 @@ int main(int argc, char* args[])
 		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
 		wait++;
 	}
-
-	lastBoostTime = SDL_GetTicks();
 	//main game loop
+	game:
+	lastBoostTime = SDL_GetTicks();
 	while (1) {
 
 		lastUpdateTime = SDL_GetTicks(); //get ticks
@@ -399,7 +399,6 @@ int main(int argc, char* args[])
 		}
 		if (SDL_GetTicks() - lastBoostTime >= BOOST_TIME && is_Boosted){
 			is_Boosted = false; 
-			printf("koniec byku\n");
 			ENEMY_SPEED -= BOOST_MUL;
 			SPAWN_INTERVAL += 300 * BOOST_MUL;
 		}
@@ -419,13 +418,11 @@ int main(int argc, char* args[])
 				lastBoostTime = SDL_GetTicks();
 			}
 			if (check_boost(&p, &b)) {
-				printf("zlapane byku\n");
 				lastBoostTime = SDL_GetTicks();
 				is_Boosted = true;
 				b.is_Present = false;
 				ENEMY_SPEED += BOOST_MUL;
 				SPAWN_INTERVAL -= 300 * BOOST_MUL;
-				printf("%d", SPAWN_INTERVAL);
 			}
 		}
 
@@ -471,6 +468,7 @@ int main(int argc, char* args[])
 	}
 
 	//game over loop
+	//
 	over:
 	score.text.rectangle.x = (SCREEN_WIDTH - score.text.rectangle.w) / 2;
 	score.text.rectangle.y = 270;
@@ -496,6 +494,8 @@ int main(int argc, char* args[])
 	SDL_DestroyTexture(p.image);
 	SDL_FreeSurface(score.text.surface); //need to add more
 	SDL_DestroyTexture(score.text.texture);
+	SDL_DestroyTexture(b.image);
+	SDL_DestroyTexture(main_menu.image);
 	SDL_DestroyTexture(ground);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
