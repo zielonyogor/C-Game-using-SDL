@@ -4,7 +4,9 @@
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 680;
@@ -29,7 +31,7 @@ SDL_Event event;
 
 //Player "class"
 struct Player {
-	int height, width, pos_x, pos_y, vel_x;
+	int height, width, vel_x;
 	SDL_Texture* image;
 	SDL_Rect rectangle;
 };
@@ -42,7 +44,6 @@ void create_player(struct Player* self, SDL_Renderer* rend, int x, int y) {
 		return;
 	}
 	self->vel_x = 0;
-	self->pos_x = x; self->pos_y = y;
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
 	self->rectangle.w = 2 * self->width; self->rectangle.h = 2 * self->height;
 	self->rectangle.x = x; self->rectangle.y = y;
@@ -69,11 +70,9 @@ void handle_input(struct Player* self) {
 }
 
 void move(struct Player* self, SDL_Renderer* rend) {
-	self->pos_x += self->vel_x;
 	self->rectangle.x += self->vel_x;
 
 	if ((self->rectangle.x < 1) || (self->rectangle.x + self->rectangle.w >= SCREEN_WIDTH)){
-		self->pos_x -= self->vel_x;
 		self->rectangle.x -= self->vel_x;
 	}
 	SDL_RenderCopy(rend, self->image, NULL, &self->rectangle);
@@ -105,7 +104,7 @@ bool move_object(struct Object* self, SDL_Renderer* rend) {
 
 bool check_collision(struct Player* self, struct Object* other) {
 	//collision and little offset on Y axis
-	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && ( other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12));
+	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && ( other->rectangle.y + other->rectangle.h < self->rectangle.y + self->rectangle.h - 12));
 }
 
 //Text "class"
@@ -119,7 +118,7 @@ struct Text{
 	SDL_Texture* texture;
 };
 
-void initialize_text(struct Text* self, SDL_Renderer* rend, int size, int x, int y, char* text[]) {
+void initialize_text(struct Text* self, SDL_Renderer* rend, int size, int x, int y, char* text) {
 	self->text = SDL_strdup(text);
 	self->fontsize = size;
 	self->text_color.r = 255; self->text_color.g = 131; self->text_color.b = 0;
@@ -139,14 +138,14 @@ struct MovingText{
 	float new_pos;
 };
 
-void initialize_movingtext(struct MovingText* self, SDL_Renderer* rend, int size, int x, int y, char* text_char[], int offset) {
+void initialize_movingtext(struct MovingText* self, SDL_Renderer* rend, int size, int x, int y, char* text_char, int offset) {
 	initialize_text(&self->text, rend, size, x, y, text_char);
 	self->offset = offset; self->starting_pos = y; 
 	self->dir = 1; self->new_pos = (float)y;
 }
 
 void move_text(struct MovingText* self, SDL_Renderer* rend) {
-	self->new_pos += 0.5 * self->dir;
+	self->new_pos += (float)(0.5 * self->dir);
 	self->text.rectangle.y = (int)self->new_pos;
 	SDL_RenderCopy(rend, self->text.texture, NULL, &self->text.rectangle);
 	if (abs(self->starting_pos - self->text.rectangle.y) > self->offset) self->dir *= -1;
@@ -158,7 +157,7 @@ struct Score {
 };
 
 void initialize_score(struct Score* self, SDL_Renderer* rend, int size, int x, int y) {
-	initialize_text(&self->text, rend, size, x, y, "00000");
+	initialize_text(&self->text, rend, size, x, y, "000000");
 	self->score = 0;
 }
 
@@ -179,13 +178,22 @@ void update_score(struct Score* self, SDL_Renderer* rend) {
 	default:
 		break;
 	}
-	sprintf(self->text.text, "%05d", self->score);
+	sprintf(self->text.text, "%06d", self->score);
 	SDL_FreeSurface(self->text.surface);
 	SDL_DestroyTexture(self->text.texture);
 	self->text.surface = TTF_RenderText_Solid(self->text.font, self->text.text, self->text.text_color);
 	self->text.texture = SDL_CreateTextureFromSurface(rend, self->text.surface);
 	TTF_SizeText(self->text.font, self->text.text, &self->text.rectangle.w, &self->text.rectangle.h);
 	SDL_RenderCopy(rend, self->text.texture, NULL, &self->text.rectangle);
+}
+
+void change_high_score(struct Score* self, SDL_Renderer* rend) {
+	sprintf(self->text.text, "%06d", self->score);
+	SDL_FreeSurface(self->text.surface);
+	SDL_DestroyTexture(self->text.texture);
+	self->text.surface = TTF_RenderText_Solid(self->text.font, self->text.text, self->text.text_color);
+	self->text.texture = SDL_CreateTextureFromSurface(rend, self->text.surface);
+	TTF_SizeText(self->text.font, self->text.text, &self->text.rectangle.w, &self->text.rectangle.h);
 }
 
 //Boost "Class"
@@ -211,7 +219,7 @@ bool move_boost(struct Boost* self, SDL_Renderer *rend) {
 }
 
 bool check_boost(struct Player *self, struct Boost *other) {
-	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && (other->rectangle.y + other->rectangle.h < self->pos_y + self->rectangle.h - 12));
+	return (SDL_HasIntersection(&self->rectangle, &other->rectangle) && (other->rectangle.y + other->rectangle.h < self->rectangle.y + self->rectangle.h - 12));
 }
 
 struct Picture{
@@ -220,7 +228,7 @@ struct Picture{
 	SDL_Rect rectangle;
 };
 
-void initialize_picture(struct Picture* self, SDL_Renderer* rend,int x, int y, char* path[]) {
+void initialize_picture(struct Picture* self, SDL_Renderer* rend,int x, int y, const char* path) {
 	self->image = IMG_LoadTexture(rend, path);
 	SDL_QueryTexture(self->image, NULL, NULL, &self->width, &self->height);
 	self->rectangle.w = 2 * self->width; self->rectangle.h = 2 * self->height;
@@ -235,7 +243,7 @@ void apply_tint(SDL_Renderer* renderer, SDL_Color color) {
 	SDL_RenderFillRect(renderer, &rect);
 }
 
-SDL_Color calculate_tint(SDL_Color *col) {
+void calculate_tint(SDL_Color *col) {
 	switch (col->g)
 	{
 	case(33): //magenta -> yellow -> cyan because i said so
@@ -259,7 +267,7 @@ int main(int argc, char* args[])
 	SDL_Init(SDL_INIT_VIDEO); //some initializations
 	IMG_Init(IMG_INIT_PNG);
 	TTF_Init();
-	srand(time(NULL));
+	srand((unsigned int)time(NULL));
 
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
@@ -281,7 +289,7 @@ int main(int argc, char* args[])
 
 	//player
 	struct Player p;
-	create_player(&p, renderer, 100, SCREEN_HEIGHT - 184);
+	create_player(&p, renderer, SCREEN_WIDTH / 2 - 76, SCREEN_HEIGHT - 184);
 
 	//score
 	struct Score score;
@@ -296,6 +304,8 @@ int main(int argc, char* args[])
 
 	struct MovingText continue_text;
 	initialize_movingtext(&continue_text, renderer, 20, -1, 100, "PRESS SPACE TO START", 2);
+	struct MovingText retry_text;
+	initialize_movingtext(&retry_text, renderer, 20, -1, 480, "PRESS R TO RETRY", 2);
 
 	struct Text how_to;
 	initialize_text(&how_to, renderer, 42, -1, 160, "HOW TO PLAY");
@@ -307,13 +317,17 @@ int main(int argc, char* args[])
 	initialize_text(&what_avoid, renderer, 26, -1, 312, "AVOID CAT FOOD");
 	struct Text score_final;
 	initialize_text(&score_final, renderer, 26, -1, 240, "YOUR SCORE:");
+	struct Text high_score;
+	initialize_text(&high_score, renderer, 26, -1, 330, "HIGHEST SCORE:");
+	struct Score high_score_nr;
+	initialize_score(&high_score_nr, renderer, 32, -1, 360);
 
 	//menu pic
 	struct Picture main_menu;
 	initialize_picture(&main_menu, renderer, 0, 0, "images/menu.png");
 
 	//falling objects
-	int numObjects = 0; struct Object objects_list[10];
+	int numObjects = 0; struct Object* objects_list = (struct Object*)malloc(10 * sizeof(struct Object));
 	
 	//boost
 	struct Boost b;
@@ -341,15 +355,16 @@ int main(int argc, char* args[])
 		move_text(&continue_text, renderer);
 		SDL_RenderPresent(renderer);
 
-		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+		while (SDL_GetTicks() - lastUpdateTime < (unsigned int)1000 / FRAMES_PER_SECOND) {}
 	}
 	//wait is so that it won't jump straight to main game
 	int wait = 0;
 	continue_text.text.rectangle.y = 400; continue_text.starting_pos = 400; continue_text.new_pos = 400.0;
+
 	//how to play intro
 	while (1) {
 		lastUpdateTime = SDL_GetTicks();
-		if (SDL_PollEvent(&event) && wait>20) { //handling all input
+		if (SDL_PollEvent(&event) && wait> 10) { //handling all input
 			if (event.key.keysym.sym == SDLK_SPACE) {
 				break;
 			}
@@ -360,14 +375,16 @@ int main(int argc, char* args[])
 		}
 		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
 		SDL_RenderClear(renderer);
+
 		SDL_RenderCopy(renderer, how_to.texture, NULL, &how_to.rectangle);
 		SDL_RenderCopy(renderer, move_as.texture, NULL, &move_as.rectangle);
 		SDL_RenderCopy(renderer, what_collect.texture, NULL, &what_collect.rectangle);
 		SDL_RenderCopy(renderer, what_avoid.texture, NULL, &what_avoid.rectangle);
 		move_text(&continue_text, renderer);
+
 		SDL_RenderPresent(renderer);
 
-		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+		while (SDL_GetTicks() - lastUpdateTime < (unsigned int)1000 / FRAMES_PER_SECOND) {}
 		wait++;
 	}
 	//main game loop
@@ -464,17 +481,33 @@ int main(int argc, char* args[])
 
 		SDL_RenderPresent(renderer);
 
-		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+		while (SDL_GetTicks() - lastUpdateTime < (unsigned int)1000 / FRAMES_PER_SECOND) {}
 	}
 
 	//game over loop
-	//
 	over:
 	score.text.rectangle.x = (SCREEN_WIDTH - score.text.rectangle.w) / 2;
 	score.text.rectangle.y = 270;
+	if (high_score_nr.score < score.score) {
+		high_score_nr.score = score.score;
+	}
+	change_high_score(&high_score_nr, renderer);
 	while (1)
 	{
+		lastUpdateTime = SDL_GetTicks();
 		if (SDL_PollEvent(&event)) { //handling all input
+			if (event.key.keysym.sym == SDLK_r) { //reset
+				p.rectangle.x = SCREEN_WIDTH / 2 - 76;
+				p.vel_x = 0;
+				score.score = 0;
+				numObjects = 0;
+				score.text.rectangle.x = 14; score.text.rectangle.y = 14;
+				SPAWN_INTERVAL = 1600;
+				is_Boosted = false;
+				b.is_Present = false;
+				b.rectangle.y = 0;
+				goto game;
+			}
 			if (event.type == SDL_QUIT)
 				break;
 			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE)
@@ -482,21 +515,44 @@ int main(int argc, char* args[])
 		}
 		SDL_SetRenderDrawColor(renderer, 148, 201, 204, 255); //draw background color
 		SDL_RenderClear(renderer);
+
 		SDL_RenderCopy(renderer, game_over.texture, NULL, &game_over.rectangle);
 		SDL_RenderCopy(renderer, score_final.texture, NULL, &score_final.rectangle);
 		SDL_RenderCopy(renderer, score.text.texture, NULL, &score.text.rectangle);
+		SDL_RenderCopy(renderer, high_score.texture, NULL, &high_score.rectangle);
+		SDL_RenderCopy(renderer, high_score_nr.text.texture, NULL, &high_score_nr.text.rectangle);
+		move_text(&retry_text, renderer);
+
 		SDL_RenderPresent(renderer);
 
-		while (SDL_GetTicks() - lastUpdateTime < 1000 / FRAMES_PER_SECOND) {}
+		while (SDL_GetTicks() - lastUpdateTime < (unsigned int)1000 / FRAMES_PER_SECOND) {}
 	}
-	//add credits?? props to tvchany
-	end:
-	SDL_DestroyTexture(p.image);
-	SDL_FreeSurface(score.text.surface); //need to add more
-	SDL_DestroyTexture(score.text.texture);
-	SDL_DestroyTexture(b.image);
+
+//memory thingy
+end:
 	SDL_DestroyTexture(main_menu.image);
+
+	SDL_FreeSurface(score.text.surface);
+	SDL_FreeSurface(high_score_nr.text.surface);
+
+	SDL_DestroyTexture(how_to.texture);
+	SDL_DestroyTexture(move_as.texture);
+	SDL_DestroyTexture(what_avoid.texture);
+	SDL_DestroyTexture(what_collect.texture);
+	SDL_DestroyTexture(high_score.texture);
+
+	SDL_DestroyTexture(title.texture);
+	SDL_DestroyTexture(continue_text.text.texture);
+	SDL_DestroyTexture(retry_text.text.texture);
+	SDL_DestroyTexture(game_over.texture);
+	SDL_DestroyTexture(score_final.texture);
+	SDL_DestroyTexture(score.text.texture);
+
+	SDL_DestroyTexture(b.image);
+	SDL_DestroyTexture(p.image);
+	free(objects_list);
 	SDL_DestroyTexture(ground);
+
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 

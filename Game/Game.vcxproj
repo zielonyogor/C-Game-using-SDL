@@ -111,7 +111,7 @@
       <AdditionalIncludeDirectories>C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2_ttf-2.20.2\include;C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2_image-2.6.3\include;C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2-2.26.5\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2_ttf-2.20.2\lib\x64;C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2-2.26.5\lib\x64;C:\Users\kasia\OneDrive\Dokumenty\libraries\SDL2_image-2.6.3\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
